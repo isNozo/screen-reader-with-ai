@@ -1,5 +1,4 @@
-import requests
-import json
+from openai import OpenAI
 import pyautogui
 import io
 import base64
@@ -8,61 +7,36 @@ import base64
 f = open("api_key", "r")
 api_key = f.read()
 
+# Init OpenAI
+client = OpenAI(api_key=api_key)
+
 
 def generate_response():
-    # API endpoint URL
-    url = "https://api.openai.com/v1/chat/completions"
-
     # Get screenshots
-    image = pyautogui.screenshot().resize((495, 270))
+    image = pyautogui.screenshot()
 
     # Convert image to base64 string
     buf = io.BytesIO()
     image.save(buf, "PNG")
     image_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    # Request headers
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
-
-    # Request data
-    data = {
-        "model": "gpt-4o-mini",
-        "messages": [
+    # Send request to API endpoint
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "What’s in this image?"},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
-                    },
+                    {"image": image_base64, "resize": 768},
                 ],
             }
         ],
-        "max_tokens": 300,
-    }
+        max_tokens=200,
+    )
 
-    try:
-        # Send POST request to API endpoint
-        response = requests.post(url, headers=headers, json=data)
-
-        # Check if the request was successful
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"Response error: {response.status_code}")
-            return None
-
-    except requests.exceptions.RequestException as e:
-        print(f"Request error: {e}")
-        return None
+    return response
 
 
 response = generate_response()
-if response is not None:
-    print(json.dumps(response, indent=4))
-else:
-    print("No response received")
+print(response.model_dump_json(indent=2))
