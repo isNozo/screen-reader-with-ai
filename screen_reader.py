@@ -18,10 +18,10 @@ def get_screenshots():
     # Create a list to store the images
     images = []
 
-    for i in range(10):
+    for i in range(8):
         # Get screenshots
         print(f"Getting screenshot {i}...")
-        image = pyautogui.screenshot().resize((480, 270))
+        image = pyautogui.screenshot().resize((240, 135))
         image.save(f"screenshot_{i}.png", "PNG")
 
         # Convert image to base64 string
@@ -30,9 +30,12 @@ def get_screenshots():
         image_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
         images.append(image_base64)
 
-        time.sleep(0.5)
+        time.sleep(1)
 
     return images
+
+
+message_history = []
 
 
 def generate_completion():
@@ -45,10 +48,15 @@ def generate_completion():
         messages=[
             {
                 "role": "user",
+                "content": "これまでの状況説明を出力してください。",
+            },
+            {"role": "assistant", "content": "\n".join(message_history)},
+            {
+                "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "これはビデオのフレームです。解説者のスタイルで140文字の短いナレーション・スクリプトを作ってください。ナレーションだけを入れてください。",
+                        "text": "これは現在の画面のフレームです。解説者として、次の場面を推測しながら状況を簡潔に短く説明してください。これまでの状況説明と合わせたとき冗長な文章とならないようにしてください。とくに文章の初めの表現が同じにならないように気を付けてください。",
                     },
                     *map(
                         lambda x: {
@@ -61,16 +69,29 @@ def generate_completion():
                         base64Frames,
                     ),
                 ],
-            }
+            },
         ],
         max_tokens=300,
     )
 
     return response
 
+
 while True:
     response = generate_completion()
     print(response.model_dump_json(indent=2))
+
+    # Add message to history
+    message = response.choices[0].message.content
+    # Limit message_history to N messages
+    if len(message_history) >= 3:
+        # Remove oldest message from history
+        del message_history[0]
+
+    # Add new message to history
+    message_history.append(message)
+
+    print("\n".join(message_history))
 
     with client.audio.speech.with_streaming_response.create(
         model="tts-1",
@@ -81,4 +102,4 @@ while True:
 
     playsound("output.mp3")
 
-    time.sleep(30)
+    time.sleep(60)
