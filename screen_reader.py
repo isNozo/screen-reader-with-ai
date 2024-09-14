@@ -3,7 +3,7 @@ import pyautogui
 import io
 import base64
 import time
-from playsound import playsound
+import pyaudio
 
 # Read API key
 f = open("api_key", "r")
@@ -30,7 +30,7 @@ def get_screenshots():
         image_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
         images.append(image_base64)
 
-        time.sleep(1)
+        time.sleep(0.6)
 
     return images
 
@@ -56,7 +56,7 @@ def generate_completion():
                 "content": [
                     {
                         "type": "text",
-                        "text": "これは現在の画面のフレームです。解説者として、次の場面を推測しながら状況を簡潔に短く説明してください。これまでの状況説明と合わせたとき冗長な文章とならないようにしてください。とくに文章の初めの表現が同じにならないように気を付けてください。",
+                        "text": "これは現在の画面のフレームです。解説者として、次の場面を推測しながら状況を簡潔に短く200文字で説明してください。これまでの状況説明と同じような内容は出力しないでください。とくに文章の初めの表現が同じにならないように気を付けてください。",
                     },
                     *map(
                         lambda x: {
@@ -77,6 +77,27 @@ def generate_completion():
     return response
 
 
+def textToSpeech(text):
+    player = pyaudio.PyAudio().open(
+        format=pyaudio.paInt16, channels=1, rate=24000, output=True
+    )
+
+    print("request TTS api")
+
+    with client.audio.speech.with_streaming_response.create(
+        model="tts-1",
+        voice="alloy",
+        response_format="pcm",
+        input=text,
+    ) as response:
+        for chunk in response.iter_bytes(chunk_size=1024):
+            player.write(chunk)
+
+    print("speech end")
+
+    return
+
+
 while True:
     response = generate_completion()
     print(response.model_dump_json(indent=2))
@@ -93,13 +114,6 @@ while True:
 
     print("\n".join(message_history))
 
-    with client.audio.speech.with_streaming_response.create(
-        model="tts-1",
-        voice="alloy",
-        input=response.choices[0].message.content,
-    ) as speech:
-        speech.stream_to_file("output.mp3")
-
-    playsound("output.mp3")
+    textToSpeech(response.choices[0].message.content)
 
     time.sleep(60)
