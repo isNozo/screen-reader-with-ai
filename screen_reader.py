@@ -18,7 +18,7 @@ def get_screenshots():
     # Create a list to store the images
     images = []
 
-    for i in range(8):
+    for i in range(6):
         # Get screenshots
         print(f"Getting screenshot {i}...")
         image = pyautogui.screenshot().resize((240, 135))
@@ -30,7 +30,7 @@ def get_screenshots():
         image_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
         images.append(image_base64)
 
-        time.sleep(0.6)
+        time.sleep(0.8)
 
     return images
 
@@ -56,7 +56,7 @@ def generate_completion():
                 "content": [
                     {
                         "type": "text",
-                        "text": "これは現在の画面のフレームです。解説者として、次の場面を推測しながら状況を簡潔に短く200文字で説明してください。これまでの状況説明と同じような内容は出力しないでください。とくに文章の初めの表現が同じにならないように気を付けてください。",
+                        "text": "これは現在の画面表示を録画した動画です。動画の内容について簡潔に短く200文字で説明してください。ただし、次の条件に従ってください。\n- 実況者と解説者の2人の掛け合いとして作ってください。\n- 出力フォーマットは次のようにしてください。\n**実況者:** [セリフ]\n**解説者:** [セリフ]\n- 画面に表示されている具体的なオブジェクトについて言及してください。",
                     },
                     *map(
                         lambda x: {
@@ -77,7 +77,7 @@ def generate_completion():
     return response
 
 
-def textToSpeech(text):
+def textToSpeech(text, voice):
     player = pyaudio.PyAudio().open(
         format=pyaudio.paInt16, channels=1, rate=24000, output=True
     )
@@ -86,7 +86,7 @@ def textToSpeech(text):
 
     with client.audio.speech.with_streaming_response.create(
         model="tts-1",
-        voice="alloy",
+        voice=voice,
         response_format="pcm",
         input=text,
     ) as response:
@@ -105,15 +105,24 @@ while True:
     # Add message to history
     message = response.choices[0].message.content
     # Limit message_history to N messages
-    if len(message_history) >= 3:
+    if len(message_history) >= 1:
         # Remove oldest message from history
         del message_history[0]
 
     # Add new message to history
     message_history.append(message)
 
-    print("\n".join(message_history))
+    # split message by each line
+    for line in message.splitlines():
+        if line == "":
+            continue
 
-    textToSpeech(response.choices[0].message.content)
+        print(line)
+
+        # if the line contains a "実況者" or "解説者", then play each voice
+        if "実況者" in line:
+            textToSpeech(line, "nova")
+        elif "解説者" in line:
+            textToSpeech(line, "onyx")
 
     time.sleep(60)
