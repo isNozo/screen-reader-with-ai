@@ -4,6 +4,8 @@ import io
 import base64
 import time
 import pyaudio
+import requests
+import json
 
 # Read API key
 f = open("api_key", "r")
@@ -18,10 +20,10 @@ def get_screenshots():
     # Create a list to store the images
     images = []
 
-    for i in range(6):
+    for i in range(4):
         # Get screenshots
         print(f"Getting screenshot {i}...")
-        image = pyautogui.screenshot().resize((240, 135))
+        image = pyautogui.screenshot().resize((480, 270))
         image.save(f"screenshot_{i}.png", "PNG")
 
         # Convert image to base64 string
@@ -98,6 +100,30 @@ def textToSpeech(text, voice):
     return
 
 
+def textToSpeech_local(text, voice):
+    player = pyaudio.PyAudio().open(
+        format=pyaudio.paInt16, channels=1, rate=24000, output=True
+    )
+
+    print("request TTS api")
+
+    query = requests.post(
+        f"http://127.0.0.1:50021/audio_query?text={text}&speaker={voice}"
+    )
+
+    synthesis = requests.post(
+        f"http://127.0.0.1:50021/synthesis?speaker={voice}",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(query.json()),
+    )
+
+    player.write(synthesis.content)
+
+    print("speech end")
+
+    return
+
+
 while True:
     response = generate_completion()
     print(response.model_dump_json(indent=2))
@@ -121,8 +147,10 @@ while True:
 
         # if the line contains a "実況者" or "解説者", then play each voice
         if "実況者" in line:
-            textToSpeech(line, "nova")
+            line = line.replace("**実況者:**", "")
+            textToSpeech_local(line, 3)
         elif "解説者" in line:
-            textToSpeech(line, "onyx")
+            line = line.replace("**解説者:**", "")
+            textToSpeech_local(line, 13)
 
     time.sleep(60)
